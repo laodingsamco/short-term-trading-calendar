@@ -1,43 +1,35 @@
-from ics import Calendar, Event
-from datetime import datetime, timedelta
-import pytz
+name: Weekly Calendar Update
 
-def create_event(title, description, date, start_hour=9, duration_mins=30):
-    event = Event()
-    est = pytz.timezone("US/Eastern")
-    start = est.localize(datetime(date.year, date.month, date.day, start_hour, 30))
-    end = start + timedelta(minutes=duration_mins)
-    event.name = title
-    event.begin = start
-    event.end = end
-    event.description = description
-    return event
+on:
+  schedule:
+    - cron: "0 1 * * 1"  # 每周一 UTC 1:00，对应北京时间上午9点
+  workflow_dispatch:     # 允许手动触发
 
-today = datetime.now(pytz.timezone("US/Eastern"))
-monday = today - timedelta(days=today.weekday())
+jobs:
+  build:
+    runs-on: ubuntu-latest
 
-c = Calendar()
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-# Tesla
-c.events.add(create_event(
-    "Tesla 本周做空观察点",
-    "Q1交付后走势弱于市场，ASP 拖累整体表现，周内反弹乏力可寻找做空窗口。",
-    monday + timedelta(days=1)
-))
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.x"
 
-# Intel
-c.events.add(create_event(
-    "Intel 本周反弹顶部预警",
-    "AI 噱头兑现短期利好后，反弹动能弱，警惕 $39.80 压力位回落。",
-    monday + timedelta(days=2)
-))
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ics pytz
 
-# 宏观预警
-c.events.add(create_event(
-    "初请 + 地缘风险监控日",
-    "周四关注地缘政治及VIX波动可能带来的短期空头机会。",
-    monday + timedelta(days=3)
-))
+      - name: Generate .ics file
+        run: python generate_calendar.py
 
-with open("short_term_trading.ics", "w") as f:
-    f.writelines(c.serialize_iter())
+      - name: Commit and push changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add short_term_trading.ics
+          git commit -m "Auto update .ics calendar" || echo "No changes to commit"
+          git push
