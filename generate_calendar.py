@@ -1,35 +1,26 @@
-name: Weekly Calendar Update
+from ics import Calendar, Event
+from datetime import datetime, timedelta
+import pytz
 
-on:
-  schedule:
-    - cron: "0 1 * * 1"  # 每周一 UTC 1:00，对应北京时间上午9点
-  workflow_dispatch:     # 允许手动触发
+# 设置美东时区
+tz = pytz.timezone("US/Eastern")
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
+# 获取本周一
+today = datetime.now(tz)
+monday = today - timedelta(days=today.weekday())
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+# 创建日历
+calendar = Calendar()
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.x"
+# 构造本周的事件（每次生成内容不同，避免重复）
+for i, stock in enumerate(["Tesla", "Intel", "Apple"]):
+    event = Event()
+    event.name = f"{stock} 本周事件 - {monday.strftime('%Y-%m-%d')}"
+    event.begin = tz.localize(datetime(monday.year, monday.month, monday.day + i, 9, 30))
+    event.end = event.begin + timedelta(minutes=30)
+    event.description = f"{stock} 自动生成的观察事件（{today.strftime('%Y-%m-%d %H:%M:%S')}）"
+    calendar.events.add(event)
 
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install ics pytz
-
-      - name: Generate .ics file
-        run: python generate_calendar.py
-
-      - name: Commit and push changes
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add short_term_trading.ics
-          git commit -m "Auto update .ics calendar" || echo "No changes to commit"
-          git push
+# 写入文件
+with open("short_term_trading.ics", "w") as f:
+    f.writelines(calendar.serialize_iter())
